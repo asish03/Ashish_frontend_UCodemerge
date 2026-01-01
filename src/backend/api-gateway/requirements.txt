@@ -1,0 +1,75 @@
+# FastAPI Core
+fastapi==0.104.1
+uvicorn[standard]==0.24.0
+pydantic==2.5.0
+pydantic-settings==2.1.0
+python-multipart==0.0.6
+
+# Database
+sqlalchemy==2.0.23
+asyncpg==0.29.0
+psycopg2-binary==2.9.9
+alembic==1.12.1
+
+# Authentication & Security
+python-jose[cryptography]==3.3.0
+passlib[bcrypt]==1.7.4
+python-dotenv==1.0.0
+cryptography==41.0.7
+
+# Redis
+redis==5.0.1
+hiredis==2.2.3
+
+# HTTP Client
+httpx==0.25.2
+aiohttp==3.9.1
+
+# AWS SDK
+boto3==1.34.10
+botocore==1.34.10
+
+# Kafka
+aiokafka==0.8.1
+
+# Temporal
+temporalio==1.4.0
+
+# ClickHouse
+clickhouse-driver==0.2.6
+clickhouse-connect==0.6.23
+
+# Monitoring & Tracing
+prometheus-client==0.19.0
+opentelemetry-api==1.21.0
+opentelemetry-sdk==1.21.0
+opentelemetry-instrumentation-fastapi==0.42b0
+prometheus-fastapi-instrumentator==6.1.0
+
+# Validation & Utilities
+email-validator==2.1.0
+phonenumbers==8.13.26
+python-slugify==8.0.1
+
+# CORS
+fastapi-cors==0.0.6
+
+# File Processing
+python-magic==0.4.27
+aiofiles==23.2.1
+
+# Testing
+pytest==7.4.3
+pytest-asyncio==0.21.1
+pytest-cov==4.1.0
+httpx==0.25.2
+
+# Code Quality
+black==23.12.1
+flake8==6.1.0
+mypy==1.7.1
+isort==5.13.2
+
+# Documentation
+mkdocs==1.5.3
+mkdocs-material==9.5.2
