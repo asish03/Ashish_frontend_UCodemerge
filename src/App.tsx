@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { LoginPage } from './components/LoginPage';
 import { DashboardLayout } from './components/DashboardLayout';
+import { Toaster } from 'sonner';
 
 export interface User {
   id: string;
@@ -40,11 +41,16 @@ function App() {
     );
   }
 
-  if (!user) {
-    return <LoginPage onLogin={handleLogin} />;
-  }
-
-  return <DashboardLayout user={user} onLogout={handleLogout} />;
+  return (
+    <>
+      <Toaster position="top-right" richColors />
+      {!user ? (
+        <LoginPage onLogin={handleLogin} />
+      ) : (
+        <DashboardLayout user={user} onLogout={handleLogout} />
+      )}
+    </>
+  );
 }
 
 export default App;

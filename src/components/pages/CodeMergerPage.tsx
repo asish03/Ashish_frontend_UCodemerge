@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import {
   Upload,
   Github,
@@ -8,7 +8,10 @@ import {
   AlertTriangle,
   FileCode,
   Trash2,
+  X,
 } from 'lucide-react';
+import { mergeApi } from '../../services/api';
+import { toast } from 'sonner';
 
 interface UploadedProject {
   id: string;
@@ -41,15 +44,180 @@ export function CodeMergerPage() {
   const [mergeStatus, setMergeStatus] = useState<'idle' | 'analyzing' | 'merging' | 'complete'>(
     'idle'
   );
+  const [isLoading, setIsLoading] = useState(false);
+  const [showPasteDialog, setShowPasteDialog] = useState(false);
+  const [pastedCode, setPastedCode] = useState('');
+  const [showGithubDialog, setShowGithubDialog] = useState(false);
+  const [githubUrl, setGithubUrl] = useState('');
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const handleStartMerge = () => {
-    setMergeStatus('analyzing');
-    setTimeout(() => setMergeStatus('merging'), 2000);
-    setTimeout(() => setMergeStatus('complete'), 4000);
+  const handleStartMerge = async () => {
+    try {
+      setIsLoading(true);
+      setMergeStatus('analyzing');
+      
+      // Call merge API
+      const response = await mergeApi.start(
+        projects.map(p => p.id),
+        'guided'
+      );
+      
+      console.log('Merge started:', response);
+      toast.success('Merge analysis started');
+      
+      // Simulate merge progress
+      setTimeout(() => setMergeStatus('merging'), 2000);
+      setTimeout(() => {
+        setMergeStatus('complete');
+        toast.success('Merge completed successfully!');
+        setIsLoading(false);
+      }, 4000);
+    } catch (error: any) {
+      console.error('Merge error:', error);
+      toast.error(error.message || 'Failed to start merge');
+      setMergeStatus('idle');
+      setIsLoading(false);
+    }
   };
 
   const handleRemoveProject = (id: string) => {
     setProjects(projects.filter((p) => p.id !== id));
+    toast.success('Project removed');
+  };
+
+  const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const files = event.target.files;
+    if (!files || files.length === 0) return;
+
+    try {
+      setIsLoading(true);
+      
+      // Create FormData for file upload
+      const formData = new FormData();
+      Array.from(files).forEach(file => {
+        formData.append('files', file);
+      });
+      
+      console.log('Uploading files:', files.length);
+      toast.info('Uploading files...');
+      
+      // Call upload API
+      const response = await mergeApi.upload({
+        source: 'upload',
+        mergeMode: 'guided',
+        files: formData
+      });
+      
+      console.log('Upload response:', response);
+      
+      // Add uploaded project to list
+      const newProject: UploadedProject = {
+        id: response.job_id || Date.now().toString(),
+        name: files[0].name.replace(/\\.zip$/, ''),
+        source: 'Upload',
+        size: `${(files[0].size / (1024 * 1024)).toFixed(1)} MB`,
+        files: response.projects?.[0]?.files || files.length,
+        language: 'JavaScript',
+      };
+      
+      setProjects([...projects, newProject]);
+      toast.success('Files uploaded successfully!');
+    } catch (error: any) {
+      console.error('Upload error:', error);
+      toast.error(error.message || 'Failed to upload files');
+    } finally {
+      setIsLoading(false);
+      if (fileInputRef.current) {
+        fileInputRef.current.value = '';
+      }
+    }
+  };
+
+  const handlePasteCode = async () => {
+    if (!pastedCode.trim()) {
+      toast.error('Please paste some code');
+      return;
+    }
+
+    try {
+      setIsLoading(true);
+      
+      console.log('Uploading pasted code...');
+      toast.info('Processing code...');
+      
+      // Call upload API with pasted code
+      const response = await mergeApi.upload({
+        source: 'paste',
+        mergeMode: 'guided',
+        files: { code: pastedCode }
+      });
+      
+      console.log('Paste response:', response);
+      
+      // Add pasted code as project
+      const newProject: UploadedProject = {
+        id: response.job_id || Date.now().toString(),
+        name: 'pasted-code',
+        source: 'Paste',
+        size: `${(pastedCode.length / 1024).toFixed(1)} KB`,
+        files: 1,
+        language: 'JavaScript',
+      };
+      
+      setProjects([...projects, newProject]);
+      setPastedCode('');
+      setShowPasteDialog(false);
+      toast.success('Code added successfully!');
+    } catch (error: any) {
+      console.error('Paste error:', error);
+      toast.error(error.message || 'Failed to add code');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleGithubImport = async () => {
+    if (!githubUrl.trim()) {
+      toast.error('Please enter a GitHub URL');
+      return;
+    }
+
+    try {
+      setIsLoading(true);
+      
+      console.log('Importing from GitHub:', githubUrl);
+      toast.info('Importing repository...');
+      
+      // Call upload API with GitHub URL
+      const response = await mergeApi.upload({
+        source: 'github',
+        mergeMode: 'guided',
+        files: { url: githubUrl }
+      });
+      
+      console.log('GitHub import response:', response);
+      
+      // Add GitHub repo as project
+      const repoName = githubUrl.split('/').pop() || 'github-repo';
+      const newProject: UploadedProject = {
+        id: response.job_id || Date.now().toString(),
+        name: repoName,
+        source: 'GitHub',
+        size: response.projects?.[0]?.size || '0 MB',
+        files: response.projects?.[0]?.files || 0,
+        language: 'JavaScript',
+      };
+      
+      setProjects([...projects, newProject]);
+      setGithubUrl('');
+      setShowGithubDialog(false);
+      toast.success('Repository imported successfully!');
+    } catch (error: any) {
+      console.error('GitHub import error:', error);
+      toast.error(error.message || 'Failed to import repository');
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   return (
@@ -63,7 +231,11 @@ export function CodeMergerPage() {
 
       {/* Upload Options */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
-        <button className="p-6 bg-white rounded-xl border-2 border-dashed border-slate-300 hover:border-purple-500 hover:bg-purple-50 transition-colors flex flex-col items-center gap-3">
+        <button 
+          onClick={() => fileInputRef.current?.click()}
+          disabled={isLoading}
+          className="p-6 bg-white rounded-xl border-2 border-dashed border-slate-300 hover:border-purple-500 hover:bg-purple-50 transition-colors flex flex-col items-center gap-3 disabled:opacity-50 disabled:cursor-not-allowed"
+        >
           <div className="w-12 h-12 bg-purple-100 rounded-lg flex items-center justify-center">
             <Upload className="w-6 h-6 text-purple-600" />
           </div>
@@ -72,8 +244,20 @@ export function CodeMergerPage() {
             <p className="text-sm text-slate-600">Drag & drop or browse files</p>
           </div>
         </button>
+        <input
+          ref={fileInputRef}
+          type="file"
+          multiple
+          accept=".zip,.js,.jsx,.ts,.tsx,.json"
+          onChange={handleFileUpload}
+          className="hidden"
+        />
 
-        <button className="p-6 bg-white rounded-xl border-2 border-dashed border-slate-300 hover:border-purple-500 hover:bg-purple-50 transition-colors flex flex-col items-center gap-3">
+        <button 
+          onClick={() => setShowGithubDialog(true)}
+          disabled={isLoading}
+          className="p-6 bg-white rounded-xl border-2 border-dashed border-slate-300 hover:border-purple-500 hover:bg-purple-50 transition-colors flex flex-col items-center gap-3 disabled:opacity-50 disabled:cursor-not-allowed"
+        >
           <div className="w-12 h-12 bg-purple-100 rounded-lg flex items-center justify-center">
             <Github className="w-6 h-6 text-purple-600" />
           </div>
@@ -83,7 +267,11 @@ export function CodeMergerPage() {
           </div>
         </button>
 
-        <button className="p-6 bg-white rounded-xl border-2 border-dashed border-slate-300 hover:border-purple-500 hover:bg-purple-50 transition-colors flex flex-col items-center gap-3">
+        <button 
+          onClick={() => setShowPasteDialog(true)}
+          disabled={isLoading}
+          className="p-6 bg-white rounded-xl border-2 border-dashed border-slate-300 hover:border-purple-500 hover:bg-purple-50 transition-colors flex flex-col items-center gap-3 disabled:opacity-50 disabled:cursor-not-allowed"
+        >
           <div className="w-12 h-12 bg-purple-100 rounded-lg flex items-center justify-center">
             <FolderOpen className="w-6 h-6 text-purple-600" />
           </div>
@@ -93,6 +281,83 @@ export function CodeMergerPage() {
           </div>
         </button>
       </div>
+
+      {/* Paste Code Dialog */}
+      {showPasteDialog && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-xl p-6 max-w-2xl w-full mx-4">
+            <div className="flex justify-between items-center mb-4">
+              <h2 className="text-xl">Paste Your Code</h2>
+              <button
+                onClick={() => setShowPasteDialog(false)}
+                className="p-2 hover:bg-slate-100 rounded-lg"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            <textarea
+              value={pastedCode}
+              onChange={(e) => setPastedCode(e.target.value)}
+              placeholder="Paste your code here..."
+              className="w-full h-64 p-4 border border-slate-300 rounded-lg font-mono text-sm"
+            />
+            <div className="flex gap-3 mt-4">
+              <button
+                onClick={handlePasteCode}
+                disabled={isLoading || !pastedCode.trim()}
+                className="px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {isLoading ? 'Adding...' : 'Add Code'}
+              </button>
+              <button
+                onClick={() => setShowPasteDialog(false)}
+                className="px-4 py-2 bg-slate-200 hover:bg-slate-300 text-slate-900 rounded-lg"
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* GitHub Import Dialog */}
+      {showGithubDialog && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-xl p-6 max-w-md w-full mx-4">
+            <div className="flex justify-between items-center mb-4">
+              <h2 className="text-xl">Import from GitHub</h2>
+              <button
+                onClick={() => setShowGithubDialog(false)}
+                className="p-2 hover:bg-slate-100 rounded-lg"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            <input
+              type="text"
+              value={githubUrl}
+              onChange={(e) => setGithubUrl(e.target.value)}
+              placeholder="https://github.com/username/repository"
+              className="w-full p-3 border border-slate-300 rounded-lg mb-4"
+            />
+            <div className="flex gap-3">
+              <button
+                onClick={handleGithubImport}
+                disabled={isLoading || !githubUrl.trim()}
+                className="px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {isLoading ? 'Importing...' : 'Import'}
+              </button>
+              <button
+                onClick={() => setShowGithubDialog(false)}
+                className="px-4 py-2 bg-slate-200 hover:bg-slate-300 text-slate-900 rounded-lg"
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Uploaded Projects */}
       <div className="bg-white rounded-xl border border-slate-200 shadow-sm mb-6">
@@ -199,11 +464,11 @@ export function CodeMergerPage() {
       <div className="flex gap-4">
         <button
           onClick={handleStartMerge}
-          disabled={projects.length < 2 || mergeStatus !== 'idle'}
+          disabled={projects.length < 2 || mergeStatus !== 'idle' || isLoading}
           className="px-6 py-3 bg-purple-600 hover:bg-purple-700 text-white rounded-lg disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
         >
           <Play className="w-5 h-5" />
-          Start Merge
+          {isLoading ? 'Starting...' : 'Start Merge'}
         </button>
         {mergeStatus === 'complete' && (
           <button className="px-6 py-3 bg-green-600 hover:bg-green-700 text-white rounded-lg flex items-center gap-2">
