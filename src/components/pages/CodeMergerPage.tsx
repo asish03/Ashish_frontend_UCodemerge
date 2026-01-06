@@ -244,14 +244,14 @@ export function CodeMergerPage() {
             <p className="text-sm text-slate-600">Drag & drop or browse files</p>
           </div>
         </button>
-        <input
+        {/* <input
           ref={fileInputRef}
           type="file"
           multiple
           accept=".zip,.js,.jsx,.ts,.tsx,.json"
           onChange={handleFileUpload}
           className="hidden"
-        />
+        /> */}
 
         <button 
           onClick={() => setShowGithubDialog(true)}
